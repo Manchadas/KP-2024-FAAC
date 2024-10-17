@@ -23,7 +23,7 @@
     }
 </script>
 
-<h1>Welcome to Form as a Code</h1>
+<h1>Welcome to Form as a Code Project</h1>
 <h2>Make your own form with this website</h2>
 
 <div class="form">

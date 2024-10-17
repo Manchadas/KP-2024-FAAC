@@ -8,14 +8,15 @@
 </div>
 
 <style>
-    .main-app{
-        height: 100;
+    .main-app {
+        min-height: 100vh;
         width: 100vw;
-        margin:0;
+        margin: 0;
         background-color: #242424;
         color: #fff;
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center; 
     }
 </style>
