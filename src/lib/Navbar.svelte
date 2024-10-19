@@ -1,12 +1,9 @@
-
- <nav>
+<nav>
     <a href="/">Home</a>
+    <a href="/form">Form</a>
+</nav>
 
-    <a href="/">Form</a>
- </nav>
-
-
- <style>
+<style>
     nav{
         padding-top: 1em;
         background-color: #242424;
@@ -15,13 +12,13 @@
         justify-content: center;
     }
     a{
-        color: whitesmoke;
+        color:#FFF;
         text-decoration: none;
         margin-left: 1em;
         font-size: larger;
     }
     a:hover{
         opacity: .5;
-        border-bottom: 2px solid #fff;
+        border-bottom: 2px solid #FFF;
     }
- </style>
+</style>
