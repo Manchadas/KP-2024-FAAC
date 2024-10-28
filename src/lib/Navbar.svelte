@@ -1,24 +1,23 @@
 <nav>
     <a href="/">Home</a>
-    <a href="/form">Form</a>
+    <a href="/signup">Sign In</a>
+    <a href="/form-builder">Form Builder</a>
 </nav>
 
 <style>
-    nav{
-        padding-top: 1em;
-        background-color: #242424;
+    nav {
         display: flex;
         flex-direction: row;
+        align-items: center;
         justify-content: center;
     }
-    a{
-        color:#FFF;
+    nav a {
+        margin: .5em;
+        color: #000000;
         text-decoration: none;
-        margin-left: 1em;
-        font-size: larger;
+        font-weight: 800;
     }
-    a:hover{
-        opacity: .5;
-        border-bottom: 2px solid #FFF;
+    nav a:hover {
+        text-decoration: underline;
     }
 </style>

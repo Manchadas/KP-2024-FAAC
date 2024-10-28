@@ -1,25 +1,31 @@
 <script>
-    import Navbar from "../lib/Navbar.svelte";
+  import Navbar from "$lib/Navbar.svelte";
+
 </script>
 
 
-<Navbar />
-<main class="main-app">
-    <slot></slot>
+<Navbar/>
+<main>
+    <slot/>
 </main>
+
+
+<svelte:head>
+    <style>
+        body{
+            margin:0;
+        }
+    </style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" />
+</svelte:head>
 
 
 
 <style>
-    .main-app{
-        height: 100vh;
-        width: 100vw;
-        margin: 0;
-        background-color: #242424;
-        color: #FFF;
+    main{
         display: flex;
         flex-direction: column;
-
+        justify-content: center;
         align-items: center;
     }
 </style>
