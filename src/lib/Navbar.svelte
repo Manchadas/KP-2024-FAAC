@@ -2,6 +2,7 @@
     <a href="/">Home</a>
     <a href="/signup">Sign In</a>
     <a href="/form-builder">Form Builder</a>
+    <a href="/review-form">Review Form</a>
 </nav>
 
 <style>
