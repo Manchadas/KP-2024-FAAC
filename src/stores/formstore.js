@@ -1,6 +1,6 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 
-// Retrieve stored form data from localStorage, or initialize with default values
+// Retrieve stored form data from localStorage or initialize with default values
 function getStoredForm() {
     if (typeof localStorage !== 'undefined') {
         const storedForm = localStorage.getItem('formStore');
@@ -20,13 +20,69 @@ formStore.subscribe((store) => {
     }
 });
 
-// Add a question
+// Add a question with initialized options
 export const addQuestion = (question) => {
-    formStore.update(store => ({
-        ...store,
-        questions: [...store.questions, question]
-    }));
+    formStore.update(store => {
+        const newQuestion = {
+            ...question,
+            itemId: question.id ? question.id.toString() : Date.now().toString(),
+            options: (question.type === 'multiple-choice' || question.type === 'radio' || question.type === 'checkbox')
+                ? question.options || []
+                : []
+        };
+
+        return {
+            ...store,
+            questions: [...store.questions, newQuestion]
+        };
+    });
 };
+
+// Format the question object to match the Google Forms API structure
+function formatQuestion(question) {
+    if (!question || !question.itemId || !question.text) {
+        console.error('Invalid question format or missing ID or text:', question);
+        return null;
+    }
+
+    const baseQuestion = {
+        itemId: question.itemId.toString(),
+        title: question.text,
+        description: question.description || '',
+        questionItem: {
+            question: {
+                required: question.required || false
+            }
+        }
+    };
+
+    if (question.type === 'text') {
+        baseQuestion.questionItem.question.textQuestion = { paragraph: false };
+    } else if (question.type === 'textarea') {
+        baseQuestion.questionItem.question.textQuestion = { paragraph: true };
+    } else if (question.type === 'multiple-choice' || question.type === 'radio') {
+        baseQuestion.questionItem.question.choiceQuestion = {
+            type: 'RADIO',
+            options: question.options && question.options.length > 0
+                ? question.options.map(option => ({ value: option.value || option.text || '' }))
+                : [],
+            shuffle: false
+        };
+    } else if (question.type === 'checkbox') {
+        baseQuestion.questionItem.question.choiceQuestion = {
+            type: 'CHECKBOX',
+            options: question.options && question.options.length > 0
+                ? question.options.map(option => ({ value: option.value || option.text || '' }))
+                : [],
+            shuffle: false
+        };
+    } else {
+        console.warn(`Unsupported question type: ${question.type}`);
+        return null;
+    }
+
+    return baseQuestion;
+}
 
 // Remove a question by index
 export const removeQuestion = (index) => {
@@ -46,4 +102,23 @@ export const updateFormDetails = (title, description) => {
         title,
         description
     }));
+};
+
+// Get JSON representation directly from the store value
+export const getFormJSON = () => {
+    const store = get(formStore);
+    return {
+        info: {
+            title: store.title || 'Untitled Form',
+            description: store.description || ''
+        },
+        items: store.questions.map(question => {
+            if (!question || !question.itemId || !question.text) {
+                console.error('Invalid question format or missing ID or text:', question);
+                return null;
+            }
+
+            return formatQuestion(question);
+        }).filter(Boolean) // Remove any nulls or invalid questions
+    };
 };

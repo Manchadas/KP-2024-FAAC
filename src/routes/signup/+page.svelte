@@ -1,7 +1,4 @@
-<script>
-    export let form;
-</script>
-    
+
     
     <div class="sign-in-wrapper">
         <div class="sign-in-content">

@@ -1,15 +1,17 @@
 <script>
-    import MultipleChoice from '$lib/multichoice.svelte';
-    import TextField from '$lib/textfield.svelte';
-    import TextArea from '$lib/textarea.svelte';
-    import RadioButton from '$lib/radiobutton.svelte';
-    import Checkbox from '$lib/checkbox.svelte';
-    import { formStore, addQuestion, removeQuestion, updateFormDetails } from '../../stores/formstore.js';
+    import QuestionRenderer from '$lib/QuestionRenderer.svelte';
+    import { formStore, addQuestion, removeQuestion, updateFormDetails, getFormJSON } from '../../stores/formstore.js';
 
     let title = '';
     let description = '';
     let questionType = 'text';
     let questionText = '';
+    let formData;
+
+    $: formData = $formStore;
+
+    $: title = formData.title;
+    $: description = formData.description;
 
     function updateTitleAndDescription() {
         updateFormDetails(title, description);
@@ -17,55 +19,42 @@
 
     function addQuestionToStore() {
         if (questionText.trim() === '') return;
+
         addQuestion({
             id: Date.now(),
             type: questionType,
             text: questionText,
-            options: []
+            required: false,
+            options: (questionType === 'multiple-choice' || questionType === 'radio' || questionType === 'checkbox') 
+                ? [{ text: 'Option 1' }, { text: 'Option 2' }] 
+                : []
         });
+
         questionText = '';
     }
 
-    async function handleSubmit() {
-        const formData = $formStore;
-        const payload = {
-            title: formData.title,
-            description: formData.description,
-            questions: formData.questions.map((question) => ({
-                type: question.type,
-                text: question.text,
-                options: question.options,
-            })),
-        };
-
-        try {
-            const response = await fetch('https://your-google-api-url', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            if (!response.ok) throw new Error('Failed to send form data');
-            const responseData = await response.json();
-            console.log('Form created successfully on Google Forms:', responseData);
-        } catch (error) {
-            console.error('Error creating Google Form:', error);
-        }
+    function downloadJSON() {
+        const jsonData = getFormJSON();
+        const dataStr = JSON.stringify(jsonData, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'formData.json';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     }
 </script>
 
 <div class="form-builder">
     <h2>Create Your Form</h2>
 
-    <!-- Form Title Input (larger) -->
     <input type="text" bind:value={title} placeholder="Form Title" on:input={updateTitleAndDescription} class="large-input" />
-
-    <!-- Form Description Input (larger) -->
     <textarea bind:value={description} placeholder="Form Description" on:input={updateTitleAndDescription} class="large-input"></textarea>
-
-    <!-- Question Text Input (larger) -->
     <input type="text" bind:value={questionText} placeholder="Enter your question" class="large-input" />
 
-    <!-- Question Type and Add Question Button aligned horizontally -->
     <div class="question-type-add">
         <select bind:value={questionType}>
             <option value="text">Text Field</option>
@@ -77,31 +66,20 @@
         <button class="add-question" on:click={addQuestionToStore}>Add Question</button>
     </div>
 
-    <!-- Submit Form Button at the bottom (green) -->
-    <button class="submit-form" on:click={handleSubmit}>Submit Form</button>
+    <button class="submit-form" on:click={downloadJSON}>Download JSON</button>
 
     <div class="questions">
         <h3>Questions Added:</h3>
         {#each $formStore.questions as question, index}
             <div class="question-item">
-                <strong>Type:</strong> {question.type} <br/>
-                <strong>Question:</strong> {question.text}
-                {#if question.type === 'text'}
-                    <TextField {question} />
-                {:else if question.type === 'textarea'}
-                    <TextArea {question} />
-                {:else if question.type === 'multiple-choice'}
-                    <MultipleChoice {question} />
-                {:else if question.type === 'radio'}
-                    <RadioButton {question} />
-                {:else if question.type === 'checkbox'}
-                    <Checkbox {question} />
-                {/if}
+                <QuestionRenderer {question} />
                 <button on:click={() => removeQuestion(index)}>Delete</button>
             </div>
         {/each}
     </div>
 </div>
+
+
 
 <style>
     .form-builder {
@@ -129,14 +107,7 @@
         margin: 10px 0;
     }
 
-    .question-type-add select {
-        flex: 1;
-        padding: 10px;
-        font-size: 1rem;
-    }
-
     .add-question {
-        flex-shrink: 0;
         background-color: #007bff;
         color: white;
         border: none;
