@@ -1,29 +1,62 @@
 import { json } from '@sveltejs/kit';
-import { GOOGLE_ACCESS_TOKEN } from '$env/static/private';
 
-export async function POST({ request }) {
-    const { formId, description, questions } = await request.json();
+export const POST = async ({ request, cookies }) => {
+    const formData = await request.json();
+    const accessToken = cookies.get('userToken');
+
+    if (!accessToken) {
+        return json({ error: 'Access token is missing' }, { status: 401 });
+    }
 
     try {
+        // Step 1: Create the form with a title
+        const createFormResponse = await fetch('https://forms.googleapis.com/v1/forms', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ info: { title: formData.info.title } })
+        });
+
+        if (!createFormResponse.ok) {
+            const errorText = await createFormResponse.text();
+            console.error('Create form response:', errorText);
+            throw new Error(`Failed to create form: ${createFormResponse.statusText}`);
+        }
+
+        const createdForm = await createFormResponse.json();
+        const formId = createdForm.formId;
+
+        // Step 2: Add description and questions using batchUpdate
         const batchUpdateUrl = `https://forms.googleapis.com/v1/forms/${formId}:batchUpdate`;
 
         const updatePayload = {
             requests: [
                 {
                     updateFormInfo: {
-                        info: { description },
-                        updateMask: 'description'
+                        info: {
+                            description: formData.info.description
+                        },
+                        updateMask: "description"
                     }
                 },
-                ...questions.map((question, index) => ({
+                ...formData.items.map((question, index) => ({
                     createItem: {
                         item: {
                             title: question.title,
                             questionItem: {
-                                question: question.questionItem.question
+                                question: {
+                                    required: question.required || false,
+                                    ...(question.questionItem.question.choiceQuestion
+                                        ? { choiceQuestion: question.questionItem.question.choiceQuestion }
+                                        : { textQuestion: {} })
+                                }
                             }
                         },
-                        location: { index }
+                        location: {
+                            index
+                        }
                     }
                 }))
             ]
@@ -32,20 +65,64 @@ export async function POST({ request }) {
         const updateResponse = await fetch(batchUpdateUrl, {
             method: 'POST',
             headers: {
-                Authorization: `Bearer ${GOOGLE_ACCESS_TOKEN}`,
+                'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(updatePayload)
         });
 
         if (!updateResponse.ok) {
-            const error = await updateResponse.json();
-            throw new Error(error.error.message);
+            const errorText = await updateResponse.text();
+            console.error('Update form response:', errorText);
+            throw new Error(`Failed to update form: ${updateResponse.statusText}`);
         }
 
-        return json({ success: true });
+        // Step 3: Conditionally enable quiz mode
+        const hasGradedQuestions = formData.items.some(
+            (item) =>
+                item.questionItem?.question?.grading &&
+                item.questionItem.question.grading.pointValue > 0 &&
+                item.questionItem.question.grading.correctAnswers?.answers?.length > 0
+        );
+
+        if (hasGradedQuestions) {
+            const enableQuizPayload = {
+                requests: [
+                    {
+                        updateSettings: {
+                            settings: {
+                                quizSettings: { isQuiz: true }
+                            },
+                            updateMask: "quizSettings.isQuiz"
+                        }
+                    }
+                ]
+            };
+
+            const quizResponse = await fetch(batchUpdateUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(enableQuizPayload)
+            });
+
+            if (!quizResponse.ok) {
+                const quizError = await quizResponse.text();
+                console.error('Quiz settings response:', quizError);
+                throw new Error('Failed to enable quiz mode');
+            }
+        }
+
+        // Return form creation details
+        return json({
+            formId,
+            formUrl: createdForm.responderUri,
+            message: "Form created successfully." + (hasGradedQuestions ? " Quiz mode enabled." : "")
+        });
     } catch (error) {
-        console.error('Failed to update Google Form:', error);
-        return json({ error: 'Failed to update Google Form' }, { status: 500 });
+        console.error('Error creating Google Form:', error);
+        return json({ error: `Failed to create Google Form: ${error.message}` }, { status: 500 });
     }
-}
+};

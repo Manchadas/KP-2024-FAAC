@@ -73,19 +73,31 @@
         {#each $formStore.questions as question, index}
             <div class="question-item">
                 <QuestionRenderer {question} />
-                <button on:click={() => removeQuestion(index)}>Delete</button>
+                <button on:click={() => removeQuestion(index)} class="delete-button">Delete</button>
             </div>
         {/each}
     </div>
 </div>
 
-
-
 <style>
+    /* Main Form Builder Styling */
     .form-builder {
         margin: 20px;
-        font-family: Arial, sans-serif;
-        max-width: 600px;
+        font-family: 'Inter', sans-serif;
+        max-width: 800px;
+        color: #ffffff;
+        background-color: #1e1e1e;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        text-align: center;
+        color: #ffa500;
     }
 
     .large-input {
@@ -94,6 +106,10 @@
         padding: 12px;
         font-size: 1rem;
         box-sizing: border-box;
+        border-radius: 5px;
+        background-color: #333333;
+        color: #ffffff;
+        border: 1px solid #555555;
     }
 
     textarea.large-input {
@@ -101,48 +117,81 @@
         min-height: 100px;
     }
 
+    .large-input::placeholder {
+        color: #aaaaaa;
+    }
+
     .question-type-add {
         display: flex;
         gap: 10px;
         margin: 10px 0;
+        justify-content: center;
     }
 
     .add-question {
-        background-color: #007bff;
+        background-color: #f58c03;
         color: white;
         border: none;
         padding: 10px 20px;
         font-size: 1rem;
         cursor: pointer;
+        border-radius: 5px;
+        transition: all 0.3s ease;
     }
 
     .add-question:hover {
-        background-color: #0056b3;
+        background-color: #3e8e41;
     }
 
     .submit-form {
         display: block;
         width: 100%;
-        background-color: #28a745;
+        background-color: #FF4D00;
         color: white;
         border: none;
         padding: 12px;
         font-size: 1rem;
         cursor: pointer;
         margin-top: 15px;
+        border-radius: 5px;
+        transition: all 0.3s ease;
     }
 
     .submit-form:hover {
-        background-color: #218838;
+        background-color: #0056b3;
     }
 
     .questions {
         margin-top: 20px;
+        color: #ffffff;
     }
 
     .question-item {
         padding: 10px;
         margin-bottom: 10px;
-        border-bottom: 1px solid #ddd;
+        border: 1px solid #555555;
+        border-radius: 8px;
+        background-color: #2c2c2c;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        transition: all 0.3s ease-in-out;
+    }
+
+    .question-item:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    .delete-button {
+        background-color: #ff4c4c;
+        color: white;
+        border: none;
+        padding: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .delete-button:hover {
+        background-color: #e43d3d;
     }
 </style>

@@ -1,8 +1,9 @@
 <nav>
     <a href="/">Home</a>
-    <a href="/signup">Sign In</a>
+    <a href="/yaml-builder">YAML builder</a>
     <a href="/form-builder">Form Builder</a>
     <a href="/review-form">Review Form</a>
+
 </nav>
 
 <style>
@@ -11,10 +12,12 @@
         flex-direction: row;
         align-items: center;
         justify-content: center;
+        background-color: #000000;
+        padding: 1rem;
     }
     nav a {
-        margin: .5em;
-        color: #000000;
+        margin: 0.5em;
+        color: #ffffff; /* Adjusted to white for black background */
         text-decoration: none;
         font-weight: 800;
     }

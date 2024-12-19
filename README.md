@@ -1,36 +1,106 @@
-
 # Google Form Creator with SvelteKit (FAAC)
 
-This project is a full-stack application built with SvelteKit and Svelte, designed to allow users to create Google Forms directly from a custom interface. The application handles Google OAuth2 authentication to securely access and interact with the Google Forms API, enabling users to programmatically create and update forms in their Google account.
+This project is a full-stack application built with SvelteKit, designed to empower users to create and customize Google Forms seamlessly. FAAC (Form as a Code) provides an interactive and user-friendly interface for building forms, either manually or by leveraging YAML configuration.
 
 ## Features
 
-- **Form Builder Interface**: Users can input a title, description, and add various types of questions, including text fields, checkboxes, multiple-choice options, and more.
-- **Google OAuth2 Authentication**: Secures access to Google Forms by requesting user permissions through Google's OAuth2 flow.
-- **Dynamic Form Creation**: Upon submission, the form data is sent to the Google Forms API to generate a Google Form in the user's account.
-- **Real-time Preview**: Users can review the form structure before creating the Google Form.
+- **Dynamic Google Form Creation**: Users can create Google Forms directly within their accounts.
+- **YAML Builder**: Write YAML code to define form structures efficiently.
+- **Interactive Form Builder**: Use a drag-and-drop interface to create forms manually.
+- **Review and Edit**: Preview forms before publishing or sending them to Google Forms.
+- **Google OAuth2 Authentication**: Securely sign in with Google to access and manage forms.
+- **Quiz Mode**: Build quizzes with graded multiple-choice questions and automatic grading.
+- **Real-Time Preview**: Instant visual feedback on forms while building them.
+
+---
 
 ## Tech Stack
 
 ### Frontend
-- **Svelte**: Used to create an interactive UI for building and previewing forms.
+- **Svelte**: Framework for building interactive user interfaces.
+- **CSS**: For styling and achieving a clean, modern design.
 
 ### Backend
-- **SvelteKit**: Serves as the backend framework, handling API routes and managing OAuth2 authorization.
-- **Node.js**: Underlies the server, managing API calls and handling requests to the Google Forms API.
+- **SvelteKit**: Backend framework handling routes, server-side rendering, and APIs.
+- **Node.js**: Server runtime for efficient API communication.
+- **Google Forms API**: To create and update forms dynamically.
 
-## Setup
+---
 
-1. Clone the repository.
-2. Install dependencies with `npm install`.
-3. Set up your Google Cloud project and OAuth2 credentials.
-4. Add your Google OAuth2 credentials in `.env` file.
-5. Run the development server with `npm run dev`.
+## Setup Instructions
 
-## Usage
+1. **Clone the Repository**:
+   ```bash
+   git clone <repository-url>
+   cd <repository-directory>
+   ```
 
-1. Sign in with your Google account to authorize the application.
-2. Use the form builder interface to create a form with your desired fields and settings.
-3. Click "Create Google Form" to send the form data to Google Forms API and create the form in your Google account.
+2. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
+3. **Set Up Google Cloud Project**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/).
+   - Create a new project.
+   - Enable the Google Forms API.
+   - Create OAuth2 credentials and download the JSON file.
+
+4. **Environment Variables**:
+   - Create a `.env` file in the project root.
+   - Add the following environment variables:
+     ```env
+     SECRET_CLIENT_ID=<your-google-client-id>
+     SECRET_CLIENT_SECRET=<your-google-client-secret>
+     REDIRECT_URL=http://localhost:5173/oauth
+     ```
+
+5. **Run the Development Server**:
+   ```bash
+   npm run dev
+   ```
+   The application will be available at `http://localhost:5173/`.
+
+---
+
+## How to Use
+
+1. **Sign In**:
+   - Click "Sign in with Google" to authorize the app.
+
+2. **YAML Builder**:
+   - Write YAML code to define your form.
+   - Preview the structure in real-time.
+   - Example YAML:
+     ```yaml
+     title: Quiz Form
+     description: This is a sample quiz form.
+     elements:
+       - type: mcq
+         label: What is 2 + 2?
+         options:
+           - 3
+           - 4
+           - 5
+         correctOption: 4
+       - type: text
+         label: What is your name?
+     ```
+
+3. **Form Builder**:
+   - Use the interface to create forms manually.
+
+4. **Review & Edit**:
+   - Preview your form before sending it to Google.
+
+5. **Create Google Form**:
+   - Click "Create Google Form" to send the data to the Google Forms API.
+
+---
+
+## Acknowledgments
+
+Special thanks to:
+- **Google Forms API** for enabling dynamic form creation.
+- **SvelteKit** for providing an excellent full-stack framework.
 
