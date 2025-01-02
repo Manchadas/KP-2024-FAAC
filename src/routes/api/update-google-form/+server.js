@@ -9,26 +9,7 @@ export const POST = async ({ request, cookies }) => {
     }
 
     try {
-        // Step 1: Create the form with a title
-        const createFormResponse = await fetch('https://forms.googleapis.com/v1/forms', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ info: { title: formData.info.title } })
-        });
-
-        if (!createFormResponse.ok) {
-            const errorText = await createFormResponse.text();
-            console.error('Create form response:', errorText);
-            throw new Error(`Failed to create form: ${createFormResponse.statusText}`);
-        }
-
-        const createdForm = await createFormResponse.json();
-        const formId = createdForm.formId;
-
-        // Step 2: Add description and questions using batchUpdate
+        const formId = formData.formId;
         const batchUpdateUrl = `https://forms.googleapis.com/v1/forms/${formId}:batchUpdate`;
 
         const updatePayload = {
@@ -45,12 +26,19 @@ export const POST = async ({ request, cookies }) => {
                     createItem: {
                         item: {
                             title: question.title,
+                            image: question.image ? { sourceUri: question.image } : null, // Attach image to the question
                             questionItem: {
                                 question: {
                                     required: question.required || false,
                                     ...(question.questionItem.question.choiceQuestion
                                         ? { choiceQuestion: question.questionItem.question.choiceQuestion }
-                                        : { textQuestion: {} })
+                                        : { textQuestion: {} }),
+                                    ...(question.questionItem.question.grading && {
+                                        grading: {
+                                            pointValue: question.questionItem.question.grading.pointValue,
+                                            correctAnswers: question.questionItem.question.grading.correctAnswers
+                                        }
+                                    })
                                 }
                             }
                         },
@@ -77,52 +65,13 @@ export const POST = async ({ request, cookies }) => {
             throw new Error(`Failed to update form: ${updateResponse.statusText}`);
         }
 
-        // Step 3: Conditionally enable quiz mode
-        const hasGradedQuestions = formData.items.some(
-            (item) =>
-                item.questionItem?.question?.grading &&
-                item.questionItem.question.grading.pointValue > 0 &&
-                item.questionItem.question.grading.correctAnswers?.answers?.length > 0
-        );
-
-        if (hasGradedQuestions) {
-            const enableQuizPayload = {
-                requests: [
-                    {
-                        updateSettings: {
-                            settings: {
-                                quizSettings: { isQuiz: true }
-                            },
-                            updateMask: "quizSettings.isQuiz"
-                        }
-                    }
-                ]
-            };
-
-            const quizResponse = await fetch(batchUpdateUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(enableQuizPayload)
-            });
-
-            if (!quizResponse.ok) {
-                const quizError = await quizResponse.text();
-                console.error('Quiz settings response:', quizError);
-                throw new Error('Failed to enable quiz mode');
-            }
-        }
-
-        // Return form creation details
+        // Return form update details
         return json({
             formId,
-            formUrl: createdForm.responderUri,
-            message: "Form created successfully." + (hasGradedQuestions ? " Quiz mode enabled." : "")
+            message: "Form updated successfully with images embedded in questions."
         });
     } catch (error) {
-        console.error('Error creating Google Form:', error);
-        return json({ error: `Failed to create Google Form: ${error.message}` }, { status: 500 });
+        console.error('Error updating Google Form:', error);
+        return json({ error: `Failed to update Google Form: ${error.message}` }, { status: 500 });
     }
 };

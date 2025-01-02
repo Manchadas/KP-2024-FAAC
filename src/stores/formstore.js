@@ -26,7 +26,7 @@ export const addQuestion = (question) => {
         const newQuestion = {
             ...question,
             itemId: question.id ? question.id.toString() : Date.now().toString(),
-            options: (question.type === 'multiple-choice' || question.type === 'radio' || question.type === 'checkbox')
+            options: (['multiple-choice', 'radio', 'checkbox'].includes(question.type))
                 ? question.options || []
                 : []
         };
@@ -40,15 +40,14 @@ export const addQuestion = (question) => {
 
 // Format the question object to match the Google Forms API structure
 function formatQuestion(question) {
-    if (!question || !question.itemId || !question.text) {
-        console.error('Invalid question format or missing ID or text:', question);
+    if (!question || !question.text) {
+        console.error('Invalid question format or missing text:', question);
         return null;
     }
 
     const baseQuestion = {
-        itemId: question.itemId.toString(),
+        itemId: question.itemId || Date.now().toString(),
         title: question.text,
-        description: question.description || '',
         questionItem: {
             question: {
                 required: question.required || false
@@ -60,20 +59,10 @@ function formatQuestion(question) {
         baseQuestion.questionItem.question.textQuestion = { paragraph: false };
     } else if (question.type === 'textarea') {
         baseQuestion.questionItem.question.textQuestion = { paragraph: true };
-    } else if (question.type === 'multiple-choice' || question.type === 'radio') {
+    } else if (['multiple-choice', 'radio', 'checkbox'].includes(question.type)) {
         baseQuestion.questionItem.question.choiceQuestion = {
-            type: 'RADIO',
-            options: question.options && question.options.length > 0
-                ? question.options.map(option => ({ value: option.value || option.text || '' }))
-                : [],
-            shuffle: false
-        };
-    } else if (question.type === 'checkbox') {
-        baseQuestion.questionItem.question.choiceQuestion = {
-            type: 'CHECKBOX',
-            options: question.options && question.options.length > 0
-                ? question.options.map(option => ({ value: option.value || option.text || '' }))
-                : [],
+            type: question.type === 'checkbox' ? 'CHECKBOX' : 'RADIO',
+            options: question.options.map(option => ({ value: option.text })),
             shuffle: false
         };
     } else {
@@ -112,13 +101,6 @@ export const getFormJSON = () => {
             title: store.title || 'Untitled Form',
             description: store.description || ''
         },
-        items: store.questions.map(question => {
-            if (!question || !question.itemId || !question.text) {
-                console.error('Invalid question format or missing ID or text:', question);
-                return null;
-            }
-
-            return formatQuestion(question);
-        }).filter(Boolean) // Remove any nulls or invalid questions
+        items: store.questions.map(formatQuestion).filter(Boolean)
     };
 };

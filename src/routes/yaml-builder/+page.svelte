@@ -1,116 +1,156 @@
 <script>
+    import { formStore } from '../../stores/formstore.js';
     import yaml from 'js-yaml';
 
-    let yamlInput = '';
-    let formJson = {};
-    let parseError = '';
+    $: formData = $formStore; // Reactively syncs with the form store
 
-    // Watch for changes to YAML input and parse it into the desired format
-    function parseYAML() {
+    let yamlInput = ''; // User-typed YAML
+    let parseError = ''; // Error feedback for invalid YAML
+
+    // Function to synchronize YAML input to form store (Manual Builder)
+    function updateFormFromYAML() {
         try {
             if (yamlInput.trim() === '') {
-                formJson = {};
+                formStore.update(store => {
+                    store.title = '';
+                    store.description = '';
+                    store.questions = [];
+                    store.quizMode = false; // Reset quizMode when the YAML is empty
+                    return store;
+                });
                 parseError = '';
             } else {
-                const rawYaml = yaml.load(yamlInput);
-                formJson = convertToGoogleFormJson(rawYaml); // Convert YAML to the desired format
-                parseError = '';
+                const parsedYAML = yaml.load(yamlInput);
+
+                formStore.update(store => {
+                    store.title = parsedYAML.title || '';
+                    store.description = parsedYAML.description || '';
+                    store.questions = (parsedYAML.elements || []).map(element => ({
+                        text: element.label || 'Untitled Question',
+                        type: element.type || 'text',
+                        required: element.required || false,
+                        options: element.options?.map(option => ({ text: option })) || [],
+                        correctOption: element.correctOption || null, // Add correctOption for quizzes
+                        image: element.image || null // Add image property
+                    }));
+
+                    // Set quizMode to true if there are multiple-choice or radio questions
+                    store.quizMode = store.questions.some(q =>
+                        (q.type === 'multiple-choice' || q.type === 'radio') && q.correctOption
+                    );
+
+                    return store;
+                });
+                parseError = ''; // Clear errors
             }
         } catch (e) {
             parseError = 'Invalid YAML: ' + e.message;
-            formJson = {};
         }
     }
 
-    $: yamlInput, parseYAML();
+    // Function to synchronize the form store (Manual Builder) to YAML
+    function updateYAMLFromForm() {
+        try {
+            const generatedYAML = yaml.dump({
+                title: formData.title,
+                description: formData.description,
+                quizMode: formData.quizMode, // Include quizMode in YAML
+                elements: formData.questions.map(question => ({
+                    label: question.text,
+                    type: question.type,
+                    required: question.required,
+                    options: question.options?.map(option => option.text) || [],
+                    correctOption: question.correctOption || null, // Include correctOption in YAML
+                    image: question.image || null // Include image in YAML
+                }))
+            });
 
-    // Convert YAML to Google Forms API JSON
-    function convertToGoogleFormJson(rawYaml) {
-        const info = {
-            title: rawYaml.title || 'Untitled Form',
-            description: rawYaml.description || '',
-        };
-
-        let hasGradedQuestions = false; // Flag for graded questions
-
-        const items = (rawYaml.elements || []).map((question, index) => {
-            const baseItem = {
-                itemId: Date.now() + index, // Generate a unique ID
-                title: question.label || question.question || 'Untitled Question',
-                description: question.placeholder || '',
-                questionItem: {
-                    question: {
-                        required: question.required === true ? true : false, // Handle required flag
-                    },
-                },
-            };
-
-            // Text or Textarea Questions
-            if (question.type === 'text') {
-                baseItem.questionItem.question.textQuestion = { paragraph: false };
-            } else if (question.type === 'textarea') {
-                baseItem.questionItem.question.textQuestion = { paragraph: true };
+            // Only update YAML input if it doesn't match the generated YAML
+            if (yamlInput !== generatedYAML) {
+                yamlInput = generatedYAML;
             }
-
-            // Multiple-Choice Questions (MCQ)
-            else if (question.type === 'radio' || question.type === 'mcq') {
-                baseItem.questionItem.question.choiceQuestion = {
-                    type: 'RADIO',
-                    options: question.options.map((option) => ({ value: String(option) })),
-                    shuffle: false,
-                };
-
-                // Graded MCQs
-                if (question.correctOption) {
-                    hasGradedQuestions = true; // Mark graded questions
-                    baseItem.questionItem.question.grading = {
-                        pointValue: 1, // Default point value
-                        correctAnswers: {
-                            answers: [{ value: String(question.correctOption) }],
-                        },
-                    };
-                }
-            }
-
-            // Checkbox Questions
-            else if (question.type === 'checkbox') {
-                baseItem.questionItem.question.choiceQuestion = {
-                    type: 'CHECKBOX',
-                    options: question.options.map((option) => ({ value: String(option) })),
-                    shuffle: false,
-                };
-            }
-
-            return baseItem;
-        });
-
-        const result = { info, items };
-
-        // Add quiz settings only if graded questions exist
-        if (hasGradedQuestions) {
-            result.updateSettings = {
-                settings: {
-                    quizSettings: { isQuiz: true },
-                },
-                updateMask: 'quizSettings.isQuiz',
-            };
+        } catch (e) {
+            console.error('Error generating YAML:', e);
         }
+    }
 
-        return result;
+    // Automatically update YAML when the form store changes
+    $: updateYAMLFromForm();
+
+    // Function to download form data as JSON
+    function downloadJSON() {
+        const jsonContent = JSON.stringify(formData, null, 2);
+        const blob = new Blob([jsonContent], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'formData.json';
+        link.click();
+        URL.revokeObjectURL(link.href);
     }
 
     // Function to create a Google Form
     async function createGoogleForm() {
-        if (!Object.keys(formJson).length) {
-            alert('No valid form data to send.');
+        if (!formData.title || formData.questions.length === 0) {
+            alert('Please provide a valid form with at least one question.');
             return;
         }
+
+        const formJSON = {
+            info: {
+                title: formData.title,
+                description: formData.description,
+            },
+            settings: {
+                quizMode: formData.quizMode // Use quizMode flag from the store
+            },
+            items: formData.questions.map((question, index) => {
+                const item = {
+                    itemId: index.toString(),
+                    title: question.text,
+                    questionItem: {
+                        question: {
+                            required: question.required,
+                            choiceQuestion:
+                                question.type === 'multiple-choice' || question.type === 'radio'
+                                    ? {
+                                          type: question.type === 'multiple-choice' ? 'CHECKBOX' : 'RADIO',
+                                          options: question.options.map(option => ({
+                                              value: option.text
+                                          })),
+                                          shuffle: false,
+                                      }
+                                    : null,
+                            textQuestion:
+                                question.type === 'text' || question.type === 'textarea'
+                                    ? { paragraph: question.type === 'textarea' }
+                                    : null,
+                        },
+                    },
+                    image: question.image ? { sourceUri: question.image } : null, // Add image property
+                };
+
+                // Add grading for quiz questions
+                if (
+                    (question.type === 'multiple-choice' || question.type === 'radio') &&
+                    question.correctOption
+                ) {
+                    item.questionItem.question.grading = {
+                        pointValue: 1, // Default point value
+                        correctAnswers: {
+                            answers: [{ value: question.correctOption }],
+                        },
+                    };
+                }
+
+                return item;
+            }),
+        };
 
         try {
             const response = await fetch('/api/create-google-form', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formJson),
+                body: JSON.stringify(formJSON),
             });
 
             const result = await response.json();
@@ -124,213 +164,64 @@
             alert(`Error creating form: ${error.message}`);
         }
     }
-
-    function downloadJSON() {
-        if (!Object.keys(formJson).length) {
-            alert('No valid form data to download.');
-            return;
-        }
-
-        const jsonContent = JSON.stringify(formJson, null, 2);
-        const blob = new Blob([jsonContent], { type: 'application/json' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'formConfig.json';
-        link.click();
-        URL.revokeObjectURL(link.href);
-    }
 </script>
 
-<style>
-    /* General Reset */
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-  
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #000000; /* Black background */
-      color: #ffffff; /* White text */
-      margin: 0;
-      padding: 0;
-    }
-  
-    /* Container Styling */
-    .container {
-      display: flex;
-      height: 80vh;
-      width: 100%;
-      gap: 1rem;
-      padding: 1rem;
-    }
-  
-    .box {
-      flex: 1;
-      padding: 1.5rem;
-      border-radius: 8px;
-      background-color: #1e1e1e; /* Dark box background */
-      box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1);
-      overflow-y: auto;
-    }
-  
-    /* Textarea Styling */
-    textarea {
-      width: 100%;
-      height: 100%;
-      resize: none;
-      border: none;
-      font-family: 'Courier New', monospace;
-      background-color: #1e1e1e; /* Same as box */
-      color: #ffffff; /* White text */
-      padding: 1rem;
-      border-radius: 8px;
-      box-shadow: inset 0 4px 10px rgba(255, 255, 255, 0.1);
-    }
-  
-    textarea::placeholder {
-      color: #aaaaaa; /* Placeholder text color */
-    }
-  
-    /* Live Preview Section */
-    .form-question {
-      margin-bottom: 1.5rem;
-      padding: 15px;
-      border-radius: 10px;
-      background: #2e2e2e; /* Slightly lighter for contrast */
-      box-shadow: 0 2px 6px rgba(255, 255, 255, 0.1);
-      transition: all 0.2s ease-in-out;
-    }
-  
-    .form-question:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 6px 12px rgba(255, 255, 255, 0.2);
-    }
-  
-    /* Headings in Preview */
-    .form-question h3 {
-      margin-bottom: 0.5rem;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: #ffffff;
-    }
-  
-    .form-question p {
-      margin: 0;
-      font-size: 1rem;
-      color: #cccccc;
-    }
-  
-    /* Box Headings */
-    .box h2 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 1rem;
-      color: #ffffff;
-    }
-  
-    .box p {
-      font-size: 1.1rem;
-      color: #cccccc;
-      margin-bottom: 2rem;
-    }
-  
-    /* Options Styling */
-    .options {
-      margin-top: 0.5rem;
-      padding-left: 1rem;
-    }
-  
-    .option {
-      margin-bottom: 0.5rem;
-      display: flex;
-      align-items: center;
-      font-size: 1rem;
-      color: #cccccc;
-    }
-  
-    .option input {
-      margin-right: 10px;
-      transform: scale(1.2);
-    }
-  
-    .option label {
-      cursor: pointer;
-    }
-  
-    /* Button Group Styling */
-    .button-group {
-      display: flex;
-      justify-content: center;
-      margin-top: 1rem;
-      gap: 10px;
-    }
-  
-    button {
-      background-color: #ff7b00; /* Bright orange for contrast */
-      color: #ffffff;
-      padding: 10px 20px;
-      border: none;
-      cursor: pointer;
-      border-radius: 5px;
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
-      transition: background-color 0.3s ease-in-out;
-    }
-  
-    button:hover {
-      background-color: #e06b00; /* Slightly darker orange */
-    }
-  
-    /* Heading for YAML Builder */
-    h3 {
-      margin-bottom: 0.5rem;
-      font-weight: 700;
-      font-size: 1.75rem;
-      text-align: center;
-      color: #ffffff;
-    }
-  </style>
-  
-
-<h1 style="text-align: center;">YAML Builder</h1>
-
 <div class="container">
+    <!-- YAML Input -->
     <div class="box">
         <h3>YAML Input</h3>
-        <textarea bind:value={yamlInput} placeholder="Write your YAML here..."></textarea>
+        <textarea
+            bind:value={yamlInput}
+            placeholder="Write your YAML here..."
+            on:input={updateFormFromYAML}
+        ></textarea>
         {#if parseError}
             <p style="color: red;">{parseError}</p>
         {/if}
     </div>
 
+    <!-- Live Preview -->
     <div class="box">
-        {#if formJson.info}
-            <h2>{formJson.info.title}</h2>
-            <p>{formJson.info.description}</p>
-            {#each formJson.items as item}
-                <div class="form-question">
-                    <h3>{item.title}</h3>
-                        <p>Type: {item.questionItem.question.choiceQuestion?.type || 'Text'}</p>
-        
-        {#if item.questionItem.question.choiceQuestion}
-            <div class="options">
-                {#each item.questionItem.question.choiceQuestion.options as option}
-                    <div class="option">
-                        <input 
-                            type="{item.questionItem.question.choiceQuestion.type === 'RADIO' ? 'radio' : 'checkbox'}" 
-                            id={option.value} 
-                            name={item.itemId} 
-                            disabled
-                        />
-                        <label for={option.value}>{option.value}</label>
-                    </div>
-                {/each}
-            </div>
-        {/if}
-    </div>
-{/each}
+        <h3>Live Preview</h3>
+        {#if formData.title}
+            <h2>{formData.title}</h2>
+            <p>{formData.description}</p>
+            {#each formData.questions as question, questionIndex}
+                <div class="review-question">
+                    <button
+                        class="delete-button"
+                        on:click={() =>
+                            formStore.update(store => {
+                                store.questions.splice(questionIndex, 1);
+                                return store;
+                            })
+                        }
+                    >
+                        X
+                    </button>
+                    {#if question.image}
+                        <img src={question.image} alt="Question Image" class="question-image" />
+                    {/if}
+                    <h3>{question.text}</h3>
+                    {#if question.type === 'multiple-choice' || question.type === 'radio'}
+                        <div class="options">
+                            {#each question.options as option}
+                                <div class="option">
+                                    <input
+                                        type={question.type === 'radio' ? 'radio' : 'checkbox'}
+                                        disabled
+                                    />
+                                    <label>{option.text}</label>
+                                </div>
+                            {/each}
+                        </div>
+                    {:else if question.type === 'text'}
+                        <input type="text" placeholder="Your answer" disabled />
+                    {:else if question.type === 'textarea'}
+                        <textarea placeholder="Your answer" disabled></textarea>
+                    {/if}
+                </div>
+            {/each}
         {:else}
             <h2>No Form Data</h2>
             <p>Enter YAML on the left to see the live preview here.</p>
@@ -339,6 +230,150 @@
 </div>
 
 <div class="button-group">
-    <button on:click={createGoogleForm}>Create Google Form</button>
     <button on:click={downloadJSON}>Download JSON</button>
+    <button on:click={createGoogleForm}>Create Google Form</button>
 </div>
+
+<style>
+
+    .question-image {
+        max-width: 100%;
+        height: auto;
+        margin: 10px 0;
+        border-radius: 8px;
+    }
+
+    .container {
+        display: flex;
+        flex-direction: row;
+        height: 90vh;
+        width: 90vw;
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .box {
+        flex: 1;
+        padding: 1.5rem;
+        border-radius: 8px;
+        background-color: #1e1e1e;
+        color: #ffffff;
+        box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1);
+        overflow-y: auto;
+    }
+
+    textarea {
+        width: 100%;
+        height: 100%;
+        font-family: 'Courier New', monospace;
+        background-color: #333333;
+        color: #ffffff;
+        padding: 1rem;
+        border-radius: 8px;
+        border: none;
+    }
+
+    .button-group {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 1rem;
+    }
+
+    button {
+        background-color: #ff7b00;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        border: none;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background-color: #e06b00;
+    }
+
+    .review-question {
+        margin-bottom: 1rem;
+        padding: 1.5rem;
+        background-color: #2c2c2c;
+        border-radius: 8px;
+        position: relative;
+    }
+
+    .delete-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: #ff4c4c;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    .delete-button:hover {
+        background-color: #e43d3d;
+    }
+
+    /* Updated styles for "Your answer" fields */
+    .review-question input[type="text"],
+    .review-question textarea {
+        width: 100%;
+        padding: 12px;
+        margin-top: 8px;
+        border-radius: 6px;
+        background-color: #333333;
+        color: #ffffff;
+        border: 1px solid #555555;
+        font-size: 0.95rem;
+        box-sizing: border-box;
+    }
+
+    .review-question input[type="text"]::placeholder,
+    .review-question textarea::placeholder {
+        color: #cccccc;
+        font-style: italic;
+    }
+
+    .review-question input[type="text"]:focus,
+    .review-question textarea:focus {
+        border: 1px solid #ffa500;
+        outline: none;
+    }
+
+    .option {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        gap: 10px;
+    }
+
+    .option input.option-text {
+        flex: 1;
+        border: 1px solid #555555;
+        border-radius: 8px;
+        padding: 10px;
+        background-color: #333333;
+        color: white;
+        font-size: 1rem;
+    }
+
+    .add-option {
+        margin-top: 5px;
+        background-color: #ffa500;
+        color: white;
+        padding: 5px 10px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: bold;
+    }
+
+    .add-option:hover {
+        background-color: #e58900;
+    }
+</style>

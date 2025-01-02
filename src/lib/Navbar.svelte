@@ -1,8 +1,7 @@
 <nav>
     <a href="/">Home</a>
-    <a href="/yaml-builder">YAML builder</a>
-    <a href="/form-builder">Form Builder</a>
-    <a href="/review-form">Review Form</a>
+    <a href="/yaml-builder">YAML Builder</a>
+    <a href="/form-builder">Manual Builder</a>
 
 </nav>
 
